@@ -1,0 +1,19 @@
+void setCountText()
+{
+    countText.text = "Count: " + count.ToString();
+
+    if (count >= 12)
+    {
+        if (winTextObject != null) winTextObject.SetActive(true);
+
+        // Notify LevelManager if it exists so it can handle timer and level progression
+        if (LevelManager.Instance != null)
+        {
+            LevelManager.Instance.OnLevelComplete();
+        }
+        else
+        {
+            Debug.Log("LevelManager not found - win registered.");
+        }
+    }
+}

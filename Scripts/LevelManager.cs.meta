@@ -1,0 +1,105 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class LevelManager : MonoBehaviour
+{
+    public static LevelManager Instance;
+
+    [Header("Optional: spawn prefab (if you want)")]
+    public GameObject ballPrefab; // optional, if you want manager to spawn the ball
+    public Transform spawnPoint;  // optional
+
+    private float levelStartTime;
+    private bool timerRunning = false;
+
+    void Awake()
+    {
+        if (Instance == null) { Instance = this; DontDestroyOnLoad(gameObject); }
+        else { Destroy(gameObject); return; }
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void Start()
+    {
+        SetupScene();
+    }
+
+    void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        SetupScene();
+    }
+
+    void SetupScene()
+    {
+        // Try to find a spawn point named "SpawnPoint" in the scene
+        if (spawnPoint == null)
+        {
+            GameObject sp = GameObject.Find("SpawnPoint");
+            if (sp) spawnPoint = sp.transform;
+        }
+        // If ballPrefab and spawnPoint are assigned, optionally spawn here (not required)
+        StartLevelTimer();
+    }
+
+    public void Respawn()
+    {
+        // naive respawn: reload current scene (keeps things simple)
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void OnLevelComplete()
+    {
+        StopLevelTimer();
+        float elapsed = Time.time - levelStartTime;
+        Debug.Log("Level complete! Time: " + elapsed.ToString("F2") + "s");
+
+        // Optionally store best time
+        string sceneName = SceneManager.GetActiveScene().name;
+        string key = "BestTime_" + sceneName;
+        if (!PlayerPrefs.HasKey(key) || elapsed < PlayerPrefs.GetFloat(key))
+        {
+            PlayerPrefs.SetFloat(key, elapsed);
+            PlayerPrefs.Save();
+            Debug.Log("New best time for " + sceneName + ": " + elapsed.ToString("F2"));
+        }
+
+        // Show finish UI if UIManager exists
+        UIManager ui = FindObjectOfType<UIManager>();
+        if (ui != null) ui.ShowLevelComplete(elapsed);
+
+        // Load next after a short delay
+        StartCoroutine(LoadNextLevelDelayed(1.0f));
+    }
+
+    IEnumerator LoadNextLevelDelayed(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        int next = SceneManager.GetActiveScene().buildIndex + 1;
+        if (next < SceneManager.sceneCountInBuildSettings)
+            SceneManager.LoadScene(next);
+        else
+            SceneManager.LoadScene(0); // or load menu - fallback to first scene
+    }
+
+    public void StartLevelTimer()
+    {
+        levelStartTime = Time.time;
+        timerRunning = true;
+        UIManager ui = FindObjectOfType<UIManager>();
+        if (ui != null) ui.StartTimer();
+    }
+
+    public void StopLevelTimer()
+    {
+        timerRunning = false;
+        UIManager ui = FindObjectOfType<UIManager>();
+        if (ui != null) ui.StopTimer(Time.time - levelStartTime);
+    }
+}
